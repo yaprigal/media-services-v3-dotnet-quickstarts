@@ -22,26 +22,18 @@ namespace EncodeAndStreamFiles
         static void Main(string[] args)
         {
             ConfigWrapper config = new ConfigWrapper();
+
             try
             {
                 IAzureMediaServicesClient client = CreateMediaServicesClient(config);
 
-<<<<<<< HEAD
-            IAzureMediaServicesClient client = CreateMediaServicesClient(config);
+                // Creating a unique suffix so that we don't have name collisions if you run the sample
+                // multiple times without cleaning up.
+                string uniqueness = Guid.NewGuid().ToString().Substring(0, 13);
 
-
-            // Creating a unique suffix so that we don't have name collisions if you run the sample
-            // multiple times without cleaning up.
-            string uniqueness = Guid.NewGuid().ToString().Substring(0, 13);
-
-            string jobName = "job-" + uniqueness;
-            string locatorName = "locator-" + uniqueness;
-            string outputAssetName = "output-" + uniqueness;
-=======
-                string jobName = "job-" + Guid.NewGuid().ToString();
-                string locatorName = "locator-" + Guid.NewGuid().ToString();
-                string outputAssetName = "output" + Guid.NewGuid().ToString();
->>>>>>> f60306445f13451672f80a514b740f6ccffb1ac7
+                string jobName = "job-" + uniqueness;
+                string locatorName = "locator-" + uniqueness;
+                string outputAssetName = "output-" + uniqueness;
 
                 Transform transform = EnsureTransformExists(client, config.ResourceGroup, config.AccountName, AdaptiveStreamingTransformName);
 
@@ -67,13 +59,11 @@ namespace EncodeAndStreamFiles
                         Console.WriteLine(url);
                     }
                 }
-<<<<<<< HEAD
 
                 Console.WriteLine("Done. Copy and paste the Streaming URL into the Azure Media Player at http://ampdemo.azureedge.net/");
                 Console.WriteLine("Press Enter to Continue");
                 Console.ReadLine();
-            }           
-=======
+                      
             }
             catch (ApiErrorException ex)
             {
@@ -82,7 +72,6 @@ namespace EncodeAndStreamFiles
                 Console.WriteLine("Code: {0}", ex.Body.Error.Code);
                 Console.WriteLine("Message: {0}", ex.Body.Error.Message);
             }
->>>>>>> f60306445f13451672f80a514b740f6ccffb1ac7
         }
         
         private static IAzureMediaServicesClient CreateMediaServicesClient(ConfigWrapper config)
