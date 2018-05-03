@@ -2,21 +2,15 @@
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.Remoting.Channels;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Azure.Management.Media;
 using Microsoft.Azure.Management.Media.Models;
-using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
-using Newtonsoft.Json;
 
 namespace EncodeAndStreamFiles
 {
     class Program
     {
-        private const string AdaptiveStreamingTransformName = "MyTransformWithAdaptiveStreamingPreset";
-        private const string PredefinedClearStreamingOnly = "Predefined_ClearStreamingOnly";
+        private const string AdaptiveStreamingTransformName = "AMSTransformWithAdaptiveStreamingPreset";
         private const string OutputFolder = @"Output";
 
         static void Main(string[] args)
@@ -73,7 +67,13 @@ namespace EncodeAndStreamFiles
                 Console.WriteLine("Message: {0}", ex.Body.Error.Message);
             }
         }
-        
+
+        /// <summary>
+        /// Creates the AzureMediaServicesClient object based on the credentials
+        /// supplied in App.config.
+        /// </summary>
+        /// <param name="config">The parm is of type ConfigWrapper. This class reads values from app.config.</param>
+        /// <returns></returns>
         private static IAzureMediaServicesClient CreateMediaServicesClient(ConfigWrapper config)
         {
             ArmClientCredentials credentials = new ArmClientCredentials(config);
@@ -84,20 +84,32 @@ namespace EncodeAndStreamFiles
             };
         }
 
+        /// <summary>
+        /// If the specified transform exists, get that transform.
+        /// If the it does not exist, creates a new transform with the specified output. 
+        /// In this case, the output is set to encode a video using one of the built-in encoding preset.
+        /// </summary>
+        /// <param name="client">The Media Services client.</param>
+        /// <param name="resourceGroupName">The name of the resource group within the Azure subscription.</param>
+        /// <param name="accountName"> The Media Services account name.</param>
+        /// <param name="transformName">The name of the transform.</param>
+        /// <returns></returns>
         private static Transform EnsureTransformExists(IAzureMediaServicesClient client,
             string resourceGroupName,
             string accountName, 
             string transformName)
         {
+            // When creating a Transform, you should first check if one already exists.
             Transform transform = client.Transforms.Get(resourceGroupName, accountName, transformName);
 
             if (transform == null)
             {
-                var output = new[]
+                // You need to specify what you want it to produce as an output
+                TransformOutput[] output = new TransformOutput[]
                 {
                     new TransformOutput
                     {
-                        // The preset for the Transform is set to one of our built-in sample presets.
+                        // The preset for the Transform is set to one of Media Services built-in sample presets.
                         // You can  customize the encoding settings by changing this to use "StandardEncoderPreset" class.
                         Preset = new BuiltInStandardEncoderPreset()
                         {
@@ -114,6 +126,16 @@ namespace EncodeAndStreamFiles
             return transform;
         }
 
+        /// <summary>
+        /// Submits a request to Media Services to apply the specified Transform to a given input video.
+        /// </summary>
+        /// <param name="client">The Media Services client.</param>
+        /// <param name="resourceGroupName">The name of the resource group within the Azure subscription.</param>
+        /// <param name="accountName"> The Media Services account name.</param>
+        /// <param name="transformName">The name of the transform.</param>
+        /// <param name="outputAssetName">The name of the output asset that will store the result of the encoding job. </param>
+        /// <param name="jobName">The name of the job.</param>
+        /// <returns></returns>
         private static Job SubmitJob(IAzureMediaServicesClient client,
             string resourceGroup,
             string accountName,
@@ -122,7 +144,8 @@ namespace EncodeAndStreamFiles
             string jobName)
         {
 
-            // This is an example ingest from HTTPs source URL - a new feature of v3 API.  Change the URL to any accessible HTTPs URL or SAS URL from Azure. 
+            // This is an example ingest from HTTPs source URL - a new feature of v3 API.  
+            // Change the URL to any accessible HTTPs URL or SAS URL from Azure. 
             JobInputHttp jobInput =
                 new JobInputHttp(files: new[] { "https://nimbuscdn-nimbuspm.streaming.mediaservices.windows.net/2b533311-b215-4409-80af-529c3e853622/Ignite-short.mp4" });
 
@@ -143,6 +166,16 @@ namespace EncodeAndStreamFiles
 
             return job;
         }
+
+        /// <summary>
+        /// Polls Media Services for the status of the Job.
+        /// </summary>
+        /// <param name="client">The Media Services client.</param>
+        /// <param name="resourceGroupName">The name of the resource group within the Azure subscription.</param>
+        /// <param name="accountName"> The Media Services account name.</param>
+        /// <param name="transformName">The name of the transform.</param>
+        /// <param name="jobName">The name of the job you submitted.</param>
+        /// <returns></returns>
         private static Job WaitForJobToFinish(IAzureMediaServicesClient client,
             string resourceGroupName,
             string accountName,
@@ -179,6 +212,16 @@ namespace EncodeAndStreamFiles
             return job;
         }
 
+        /// <summary>
+        /// Creates a StreamingLocator for the specified asset and with the specified streaming policy name.
+        /// Once the StreamingLocator is created the output asset is available to clients for playback.
+        /// </summary>
+        /// <param name="client">The Media Services client.</param>
+        /// <param name="resourceGroupName">The name of the resource group within the Azure subscription.</param>
+        /// <param name="accountName"> The Media Services account name.</param>
+        /// <param name="assetName">The name of the output asset.</param>
+        /// <param name="locatorName">The StreamingLocator name (unique in this case).</param>
+        /// <returns></returns>
         private static StreamingLocator CreateStreamingLocator(IAzureMediaServicesClient client,
             string resourceGroup,
             string accountName,
@@ -192,12 +235,22 @@ namespace EncodeAndStreamFiles
                 new StreamingLocator()
                 {
                     AssetName = assetName,
-                    StreamingPolicyName = PredefinedClearStreamingOnly,
+                    StreamingPolicyName = PredefinedStreamingPolicy.ClearStreamingOnly,
                 });
-
+           
             return locator;
         }
 
+        /// <summary>
+        /// Checks if the "default" streaming endpoint is in the running state,
+        /// if not, starts it.
+        /// Then, builds the streaming URLs.
+        /// </summary>
+        /// <param name="client">The Media Services client.</param>
+        /// <param name="resourceGroupName">The name of the resource group within the Azure subscription.</param>
+        /// <param name="accountName"> The Media Services account name.</param>
+        /// <param name="locatorName">The name of the StreamingLocator that was created.</param>
+        /// <returns></returns>
         static IList<string> GetStreamingURLs(
             IAzureMediaServicesClient client,
             string resourceGroupName,
@@ -226,6 +279,14 @@ namespace EncodeAndStreamFiles
             return streamingURLs;
         }
 
+        /// <summary>
+        ///  Downloads the results from the specified output asset, so you can see what you got.
+        /// </summary>
+        /// <param name="client">The Media Services client.</param>
+        /// <param name="resourceGroupName">The name of the resource group within the Azure subscription.</param>
+        /// <param name="accountName"> The Media Services account name.</param>
+        /// <param name="assetName">The output asset.</param>
+        /// <param name="resultsFolder">The name of the folder into which to download the results.</param>
         private static void DownloadResults(IAzureMediaServicesClient client,
             string resourceGroup,
             string accountName,
@@ -263,6 +324,15 @@ namespace EncodeAndStreamFiles
             Console.WriteLine("Download complete.");
         }
 
+        /// <summary>
+        /// Deletes the jobs and assets that were created.
+        /// Generally, you should clean up everything except objects 
+        /// that you are planning to reuse (typically, you will reuse Transforms, and you will persist StreamingLocators).
+        /// </summary>
+        /// <param name="client"></param>
+        /// <param name="resourceGroupName"></param>
+        /// <param name="accountName"></param>
+        /// <param name="transformName"></param>
         static void CleanUp(IAzureMediaServicesClient client,
             string resourceGroupName,
             string accountName, 
