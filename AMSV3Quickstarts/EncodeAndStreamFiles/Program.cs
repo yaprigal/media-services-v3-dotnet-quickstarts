@@ -1,4 +1,5 @@
-﻿using System;
+
+using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,7 +20,10 @@ namespace EncodeAndStreamFiles
 
             try
             {
-                IAzureMediaServicesClient client = CreateMediaServicesClient(config);
+                IAzureMediaServicesClient client = CreateMediaServicesClient(config);   
+                // Set the polling interval for long running operations to 2 seconds.
+                // The default value is 30 seconds for the .NET client SDK
+                client.LongRunningOperationRetryTimeout = 2;
 
                 // Creating a unique suffix so that we don't have name collisions if you run the sample
                 // multiple times without cleaning up.
@@ -29,12 +33,18 @@ namespace EncodeAndStreamFiles
                 string locatorName = "locator-" + uniqueness;
                 string outputAssetName = "output-" + uniqueness;
 
+                // Ensure that you have the desired encoding Transform. This is really a one time setup operation.
                 Transform transform = EnsureTransformExists(client, config.ResourceGroup, config.AccountName, AdaptiveStreamingTransformName);
 
+                // Output from the encoding Job must be written to an Asset, so let's create one
                 Asset outputAsset = client.Assets.CreateOrUpdate(config.ResourceGroup, config.AccountName, outputAssetName, new Asset());
 
                 Job job = SubmitJob(client, config.ResourceGroup, config.AccountName, AdaptiveStreamingTransformName, outputAsset.Name, jobName);
 
+                
+                // In this demo code, we will poll for Job status
+                // Polling is not a recommended best practice for production applications because of the latency it introduces.
+                // Overuse of this API may trigger throttling.
                 job = WaitForJobToFinish(client, config.ResourceGroup, config.AccountName, AdaptiveStreamingTransformName, jobName);
 
                 if (job.State == JobState.Finished)
@@ -43,7 +53,8 @@ namespace EncodeAndStreamFiles
                     if (!Directory.Exists(OutputFolder))
                         Directory.CreateDirectory(OutputFolder);
 
-                    DownloadResults(client, config.ResourceGroup, config.AccountName, outputAsset.Name, OutputFolder);
+                    // In case you don't want to stream the results from Media Services, you can choose to download the files
+                    // DownloadResults(client, config.ResourceGroup, config.AccountName, outputAsset.Name, OutputFolder);
 
                     StreamingLocator locator = CreateStreamingLocator(client, config.ResourceGroup, config.AccountName, outputAsset.Name, locatorName);
 
@@ -63,8 +74,7 @@ namespace EncodeAndStreamFiles
             {
                 Console.WriteLine("{0}", ex.Message);
 
-                Console.WriteLine("Code: {0}", ex.Body.Error.Code);
-                Console.WriteLine("Message: {0}", ex.Body.Error.Message);
+               Console.WriteLine("ERROR:API call failed with error code: {0} and message: {1}", code, message);
             }
         }
 
@@ -87,7 +97,7 @@ namespace EncodeAndStreamFiles
         /// <summary>
         /// If the specified transform exists, get that transform.
         /// If the it does not exist, creates a new transform with the specified output. 
-        /// In this case, the output is set to encode a video using one of the built-in encoding preset.
+        /// In this case, the output is set to encode a video using one of the built-in encoding presets.
         /// </summary>
         /// <param name="client">The Media Services client.</param>
         /// <param name="resourceGroupName">The name of the resource group within the Azure subscription.</param>
@@ -99,7 +109,9 @@ namespace EncodeAndStreamFiles
             string accountName, 
             string transformName)
         {
-            // When creating a Transform, you should first check if one already exists.
+            
+            // Does a Transform already exist with the desired name? Assume that an existing Transform with the desired name
+            // also uses the same recipe or Preset for processing content.
             Transform transform = client.Transforms.Get(resourceGroupName, accountName, transformName);
 
             if (transform == null)
@@ -119,7 +131,7 @@ namespace EncodeAndStreamFiles
                     }
                 };
 
-                transform = new Transform(output);
+                // Create the Transform with the output defined above
                 transform = client.Transforms.CreateOrUpdate(resourceGroupName, accountName, transformName, output);
             }
 
@@ -133,8 +145,8 @@ namespace EncodeAndStreamFiles
         /// <param name="resourceGroupName">The name of the resource group within the Azure subscription.</param>
         /// <param name="accountName"> The Media Services account name.</param>
         /// <param name="transformName">The name of the transform.</param>
-        /// <param name="outputAssetName">The name of the output asset that will store the result of the encoding job. </param>
-        /// <param name="jobName">The name of the job.</param>
+        /// <param name="outputAssetName">The (unique) name of the  output asset that will store the result of the encoding job. </param>
+        /// <param name="jobName">The (unique) name of the job.</param>
         /// <returns></returns>
         private static Job SubmitJob(IAzureMediaServicesClient client,
             string resourceGroup,
@@ -144,8 +156,8 @@ namespace EncodeAndStreamFiles
             string jobName)
         {
 
-            // This is an example ingest from HTTPs source URL - a new feature of v3 API.  
-            // Change the URL to any accessible HTTPs URL or SAS URL from Azure. 
+            // This example shows how to encode from any HTTPs source URL - a new feature of the v3 API.  
+            // Change the URL to any accessible HTTPs URL or SAS URL from Azure.
             JobInputHttp jobInput =
                 new JobInputHttp(files: new[] { "https://nimbuscdn-nimbuspm.streaming.mediaservices.windows.net/2b533311-b215-4409-80af-529c3e853622/Ignite-short.mp4" });
 
@@ -259,21 +271,20 @@ namespace EncodeAndStreamFiles
         {
             IList<string> streamingURLs = new List<string>();
 
-            string streamingUrlPrefx = "";
+            string streamingUrlPrefix = "";
 
             StreamingEndpoint streamingEndpoint = client.StreamingEndpoints.Get(resourceGroupName, accountName, "default");
 
             if (streamingEndpoint != null)
             {
-                streamingUrlPrefx = streamingEndpoint.HostName;
+                streamingUrlPrefix = streamingEndpoint.HostName;
                 if(streamingEndpoint.ResourceState != StreamingEndpointResourceState.Running)
                     client.StreamingEndpoints.Start(resourceGroupName, accountName, "default");
             }
 
-
             foreach (var path in client.StreamingLocators.ListPaths(resourceGroupName, accountName, locatorName).StreamingPaths)
             {
-                streamingURLs.Add("http://" + streamingUrlPrefx + path.Paths[0].ToString());
+                streamingURLs.Add("http://" + streamingUrlPrefix + path.Paths[0].ToString());
             }
 
             return streamingURLs;
