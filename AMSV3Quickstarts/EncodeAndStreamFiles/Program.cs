@@ -1,4 +1,3 @@
-
 using System;
 using System.IO;
 using System.Collections.Generic;
@@ -44,7 +43,7 @@ namespace EncodeAndStreamFiles
                 
                 // In this demo code, we will poll for Job status
                 // Polling is not a recommended best practice for production applications because of the latency it introduces.
-                // Overuse of this API may trigger throttling.
+                // Overuse of this API may trigger throttling. Developers should instead use Event Grid.
                 job = WaitForJobToFinish(client, config.ResourceGroup, config.AccountName, AdaptiveStreamingTransformName, jobName);
 
                 if (job.State == JobState.Finished)
