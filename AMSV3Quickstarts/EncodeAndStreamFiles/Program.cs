@@ -10,7 +10,7 @@ namespace EncodeAndStreamFiles
 {
     class Program
     {
-        private const string AdaptiveStreamingTransformName = "AMSTransformWithAdaptiveStreamingPreset";
+        private const string AdaptiveStreamingTransformName = "MyTransformWithAdaptiveStreamingPreset";
         private const string OutputFolder = @"Output";
 
         static void Main(string[] args)
