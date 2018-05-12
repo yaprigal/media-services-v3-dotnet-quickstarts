@@ -105,6 +105,7 @@ namespace EncodeAndStreamFiles
         /// <param name="accountName"> The Media Services account name.</param>
         /// <param name="transformName">The name of the transform.</param>
         /// <returns></returns>
+        #region EnsureTransformExists
         private static Transform EnsureTransformExists(IAzureMediaServicesClient client,
             string resourceGroupName,
             string accountName, 
@@ -138,7 +139,8 @@ namespace EncodeAndStreamFiles
 
             return transform;
         }
-
+        #endregion
+            
         /// <summary>
         /// Submits a request to Media Services to apply the specified Transform to a given input video.
         /// </summary>
@@ -149,6 +151,7 @@ namespace EncodeAndStreamFiles
         /// <param name="outputAssetName">The (unique) name of the  output asset that will store the result of the encoding job. </param>
         /// <param name="jobName">The (unique) name of the job.</param>
         /// <returns></returns>
+        #region SubmitJob
         private static Job SubmitJob(IAzureMediaServicesClient client,
             string resourceGroup,
             string accountName,
@@ -179,7 +182,8 @@ namespace EncodeAndStreamFiles
 
             return job;
         }
-
+        #endregion
+            
         /// <summary>
         /// Polls Media Services for the status of the Job.
         /// </summary>
@@ -189,6 +193,7 @@ namespace EncodeAndStreamFiles
         /// <param name="transformName">The name of the transform.</param>
         /// <param name="jobName">The name of the job you submitted.</param>
         /// <returns></returns>
+        #region WaitForJobToFinish
         private static Job WaitForJobToFinish(IAzureMediaServicesClient client,
             string resourceGroupName,
             string accountName,
@@ -224,7 +229,8 @@ namespace EncodeAndStreamFiles
 
             return job;
         }
-
+        #endregion
+            
         /// <summary>
         /// Creates a StreamingLocator for the specified asset and with the specified streaming policy name.
         /// Once the StreamingLocator is created the output asset is available to clients for playback.
@@ -235,6 +241,7 @@ namespace EncodeAndStreamFiles
         /// <param name="assetName">The name of the output asset.</param>
         /// <param name="locatorName">The StreamingLocator name (unique in this case).</param>
         /// <returns></returns>
+        #region CreateStreamingLocator
         private static StreamingLocator CreateStreamingLocator(IAzureMediaServicesClient client,
             string resourceGroup,
             string accountName,
@@ -253,7 +260,8 @@ namespace EncodeAndStreamFiles
            
             return locator;
         }
-
+        #endregion
+            
         /// <summary>
         /// Checks if the "default" streaming endpoint is in the running state,
         /// if not, starts it.
@@ -264,6 +272,7 @@ namespace EncodeAndStreamFiles
         /// <param name="accountName"> The Media Services account name.</param>
         /// <param name="locatorName">The name of the StreamingLocator that was created.</param>
         /// <returns></returns>
+        #region GetStreamingURLs
         static IList<string> GetStreamingURLs(
             IAzureMediaServicesClient client,
             string resourceGroupName,
@@ -290,7 +299,8 @@ namespace EncodeAndStreamFiles
 
             return streamingURLs;
         }
-
+        #endregion
+            
         /// <summary>
         ///  Downloads the results from the specified output asset, so you can see what you got.
         /// </summary>
@@ -299,6 +309,7 @@ namespace EncodeAndStreamFiles
         /// <param name="accountName"> The Media Services account name.</param>
         /// <param name="assetName">The output asset.</param>
         /// <param name="resultsFolder">The name of the folder into which to download the results.</param>
+        #region DownloadResults
         private static void DownloadResults(IAzureMediaServicesClient client,
             string resourceGroup,
             string accountName,
@@ -335,7 +346,8 @@ namespace EncodeAndStreamFiles
 
             Console.WriteLine("Download complete.");
         }
-
+        #endregion
+            
         /// <summary>
         /// Deletes the jobs and assets that were created.
         /// Generally, you should clean up everything except objects 
@@ -345,6 +357,7 @@ namespace EncodeAndStreamFiles
         /// <param name="resourceGroupName"></param>
         /// <param name="accountName"></param>
         /// <param name="transformName"></param>
+        #region CleanUp
         static void CleanUp(IAzureMediaServicesClient client,
             string resourceGroupName,
             string accountName, 
@@ -360,5 +373,6 @@ namespace EncodeAndStreamFiles
                 client.Assets.Delete(resourceGroupName, accountName, asset.Name);
             }
         }
+        #endregion
     }
 }
