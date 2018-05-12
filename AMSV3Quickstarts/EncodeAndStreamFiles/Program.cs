@@ -19,7 +19,7 @@ namespace EncodeAndStreamFiles
 
             try
             {
-                IAzureMediaServicesClient client = CreateMediaServicesClient(config);   
+                IAzureMediaServicesClient client = CreateMediaServicesClient(config);
                 // Set the polling interval for long running operations to 2 seconds.
                 // The default value is 30 seconds for the .NET client SDK
                 client.LongRunningOperationRetryTimeout = 2;
@@ -36,11 +36,10 @@ namespace EncodeAndStreamFiles
                 Transform transform = EnsureTransformExists(client, config.ResourceGroup, config.AccountName, AdaptiveStreamingTransformName);
 
                 // Output from the encoding Job must be written to an Asset, so let's create one
-                Asset outputAsset = client.Assets.CreateOrUpdate(config.ResourceGroup, config.AccountName, outputAssetName, new Asset());
+                Asset outputAsset = CreateOutputAsset(client, config.ResourceGroup, config.AccountName, outputAssetName);
 
                 Job job = SubmitJob(client, config.ResourceGroup, config.AccountName, AdaptiveStreamingTransformName, outputAsset.Name, jobName);
 
-                
                 // In this demo code, we will poll for Job status
                 // Polling is not a recommended best practice for production applications because of the latency it introduces.
                 // Overuse of this API may trigger throttling. Developers should instead use Event Grid.
@@ -67,13 +66,14 @@ namespace EncodeAndStreamFiles
                 Console.WriteLine("Done. Copy and paste the Streaming URL into the Azure Media Player at http://ampdemo.azureedge.net/");
                 Console.WriteLine("Press Enter to Continue");
                 Console.ReadLine();
-                      
+
             }
             catch (ApiErrorException ex)
             {
                 Console.WriteLine("{0}", ex.Message);
 
-               Console.WriteLine("ERROR:API call failed with error code: {0} and message: {1}", code, message);
+                Console.WriteLine("ERROR:API call failed with error code: {0} and message: {1}",
+                    ex.Body.Error.Code, ex.Body.Error.Message);
             }
         }
 
@@ -83,7 +83,7 @@ namespace EncodeAndStreamFiles
         /// </summary>
         /// <param name="config">The parm is of type ConfigWrapper. This class reads values from app.config.</param>
         /// <returns></returns>
-        #region CreateMediaServicesClient
+        // <CreateMediaServicesClient>
         private static IAzureMediaServicesClient CreateMediaServicesClient(ConfigWrapper config)
         {
             ArmClientCredentials credentials = new ArmClientCredentials(config);
@@ -93,8 +93,8 @@ namespace EncodeAndStreamFiles
                 SubscriptionId = config.SubscriptionId,
             };
         }
-        #endregion
-            
+        // </CreateMediaServicesClient>
+
         /// <summary>
         /// If the specified transform exists, get that transform.
         /// If the it does not exist, creates a new transform with the specified output. 
@@ -105,13 +105,12 @@ namespace EncodeAndStreamFiles
         /// <param name="accountName"> The Media Services account name.</param>
         /// <param name="transformName">The name of the transform.</param>
         /// <returns></returns>
-        #region EnsureTransformExists
+        // <EnsureTransformExists>
         private static Transform EnsureTransformExists(IAzureMediaServicesClient client,
             string resourceGroupName,
-            string accountName, 
+            string accountName,
             string transformName)
         {
-            
             // Does a Transform already exist with the desired name? Assume that an existing Transform with the desired name
             // also uses the same recipe or Preset for processing content.
             Transform transform = client.Transforms.Get(resourceGroupName, accountName, transformName);
@@ -139,8 +138,40 @@ namespace EncodeAndStreamFiles
 
             return transform;
         }
-        #endregion
-            
+        // </EnsureTransformExists>
+
+        /// <summary>
+        /// Creates an ouput asset. The output from the encoding Job must be written to an Asset.
+        /// </summary>
+        /// <param name="client">The Media Services client.</param>
+        /// <param name="resourceGroupName">The name of the resource group within the Azure subscription.</param>
+        /// <param name="accountName"> The Media Services account name.</param>
+        /// <param name="assetName">The output asset name.</param>
+        /// <returns></returns>
+        // <CreateOutputAsset>
+        private static Asset CreateOutputAsset(IAzureMediaServicesClient client, 
+            string resourceGroupName, 
+            string accountName, 
+            string assetName)
+        {
+            // Check if an Asset already exists
+            Asset outputAsset = client.Assets.Get(resourceGroupName, accountName, assetName);
+            Asset asset = new Asset();
+            string outputAssetName = assetName;
+
+            if (outputAsset != null)
+            {
+                // Name collision! In order to get the sample to work, let's just go ahead and create a unique asset name
+                // Note that the returned Asset can have a different name than the one specified as an input parameter.
+                // You may want to update this part to throw an Exception instead, and handle name collisions differently.
+                string uniqueness = @"-" + Guid.NewGuid().ToString();
+                outputAssetName += uniqueness;
+            }
+
+            return client.Assets.CreateOrUpdate(resourceGroupName, accountName, outputAssetName, asset);
+        }
+        // </CreateOutputAsset>
+
         /// <summary>
         /// Submits a request to Media Services to apply the specified Transform to a given input video.
         /// </summary>
@@ -151,7 +182,7 @@ namespace EncodeAndStreamFiles
         /// <param name="outputAssetName">The (unique) name of the  output asset that will store the result of the encoding job. </param>
         /// <param name="jobName">The (unique) name of the job.</param>
         /// <returns></returns>
-        #region SubmitJob
+        // <SubmitJob>
         private static Job SubmitJob(IAzureMediaServicesClient client,
             string resourceGroup,
             string accountName,
@@ -159,7 +190,6 @@ namespace EncodeAndStreamFiles
             string outputAssetName,
             string jobName)
         {
-
             // This example shows how to encode from any HTTPs source URL - a new feature of the v3 API.  
             // Change the URL to any accessible HTTPs URL or SAS URL from Azure.
             JobInputHttp jobInput =
@@ -170,8 +200,14 @@ namespace EncodeAndStreamFiles
                 new JobOutputAsset(outputAssetName),
             };
 
+            // In this example, we are assuming that the job name is unique.
+            //
+            // If you might already have a job with the desired name, use the **Jobs.Get** method
+            // to get the existing job. In Media Services v3, **Get** methods on entities returns null 
+            // if the entity doesn’t exist (a case-insensitive check on the name).
             Job job = client.Jobs.Create(
-                resourceGroup, accountName,
+                resourceGroup,
+                accountName,
                 transformName,
                 jobName,
                 new Job
@@ -182,8 +218,8 @@ namespace EncodeAndStreamFiles
 
             return job;
         }
-        #endregion
-            
+        // </SubmitJob>
+
         /// <summary>
         /// Polls Media Services for the status of the Job.
         /// </summary>
@@ -193,7 +229,7 @@ namespace EncodeAndStreamFiles
         /// <param name="transformName">The name of the transform.</param>
         /// <param name="jobName">The name of the job you submitted.</param>
         /// <returns></returns>
-        #region WaitForJobToFinish
+        // <WaitForJobToFinish>
         private static Job WaitForJobToFinish(IAzureMediaServicesClient client,
             string resourceGroupName,
             string accountName,
@@ -229,8 +265,8 @@ namespace EncodeAndStreamFiles
 
             return job;
         }
-        #endregion
-            
+        // </WaitForJobToFinish>
+
         /// <summary>
         /// Creates a StreamingLocator for the specified asset and with the specified streaming policy name.
         /// Once the StreamingLocator is created the output asset is available to clients for playback.
@@ -241,7 +277,7 @@ namespace EncodeAndStreamFiles
         /// <param name="assetName">The name of the output asset.</param>
         /// <param name="locatorName">The StreamingLocator name (unique in this case).</param>
         /// <returns></returns>
-        #region CreateStreamingLocator
+        // <CreateStreamingLocator>
         private static StreamingLocator CreateStreamingLocator(IAzureMediaServicesClient client,
             string resourceGroup,
             string accountName,
@@ -257,11 +293,11 @@ namespace EncodeAndStreamFiles
                     AssetName = assetName,
                     StreamingPolicyName = PredefinedStreamingPolicy.ClearStreamingOnly,
                 });
-           
+
             return locator;
         }
-        #endregion
-            
+        // </CreateStreamingLocator>
+
         /// <summary>
         /// Checks if the "default" streaming endpoint is in the running state,
         /// if not, starts it.
@@ -272,7 +308,7 @@ namespace EncodeAndStreamFiles
         /// <param name="accountName"> The Media Services account name.</param>
         /// <param name="locatorName">The name of the StreamingLocator that was created.</param>
         /// <returns></returns>
-        #region GetStreamingURLs
+        // <GetStreamingURLs>
         static IList<string> GetStreamingURLs(
             IAzureMediaServicesClient client,
             string resourceGroupName,
@@ -288,7 +324,7 @@ namespace EncodeAndStreamFiles
             if (streamingEndpoint != null)
             {
                 streamingUrlPrefix = streamingEndpoint.HostName;
-                if(streamingEndpoint.ResourceState != StreamingEndpointResourceState.Running)
+                if (streamingEndpoint.ResourceState != StreamingEndpointResourceState.Running)
                     client.StreamingEndpoints.Start(resourceGroupName, accountName, "default");
             }
 
@@ -299,8 +335,8 @@ namespace EncodeAndStreamFiles
 
             return streamingURLs;
         }
-        #endregion
-            
+        // </GetStreamingURLs>
+
         /// <summary>
         ///  Downloads the results from the specified output asset, so you can see what you got.
         /// </summary>
@@ -309,17 +345,17 @@ namespace EncodeAndStreamFiles
         /// <param name="accountName"> The Media Services account name.</param>
         /// <param name="assetName">The output asset.</param>
         /// <param name="resultsFolder">The name of the folder into which to download the results.</param>
-        #region DownloadResults
+        // <DownloadResults>
         private static void DownloadResults(IAzureMediaServicesClient client,
             string resourceGroup,
             string accountName,
             string assetName,
             string resultsFolder)
         {
-            
+
             AssetContainerSas assetContainerSas = client.Assets.ListContainerSas(
-                                                                                resourceGroup, 
-                                                                                accountName, 
+                                                                                resourceGroup,
+                                                                                accountName,
                                                                                 assetName,
                                                                                 permissions: AssetContainerPermission.Read,
                                                                                 expiryTime: DateTime.UtcNow.AddHours(1)
@@ -346,8 +382,8 @@ namespace EncodeAndStreamFiles
 
             Console.WriteLine("Download complete.");
         }
-        #endregion
-            
+        // </DownloadResults>
+
         /// <summary>
         /// Deletes the jobs and assets that were created.
         /// Generally, you should clean up everything except objects 
@@ -357,10 +393,10 @@ namespace EncodeAndStreamFiles
         /// <param name="resourceGroupName"></param>
         /// <param name="accountName"></param>
         /// <param name="transformName"></param>
-        #region CleanUp
+        // <CleanUp>
         static void CleanUp(IAzureMediaServicesClient client,
             string resourceGroupName,
-            string accountName, 
+            string accountName,
             string transformName)
         {
             foreach (var job in client.Jobs.List(resourceGroupName, accountName, transformName))
@@ -373,6 +409,6 @@ namespace EncodeAndStreamFiles
                 client.Assets.Delete(resourceGroupName, accountName, asset.Name);
             }
         }
-        #endregion
+        // </CleanUp>
     }
 }
