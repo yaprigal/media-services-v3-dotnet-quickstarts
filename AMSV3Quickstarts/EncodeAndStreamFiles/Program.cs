@@ -83,6 +83,7 @@ namespace EncodeAndStreamFiles
         /// </summary>
         /// <param name="config">The parm is of type ConfigWrapper. This class reads values from app.config.</param>
         /// <returns></returns>
+        #region CreateMediaServicesClient
         private static IAzureMediaServicesClient CreateMediaServicesClient(ConfigWrapper config)
         {
             ArmClientCredentials credentials = new ArmClientCredentials(config);
@@ -92,7 +93,8 @@ namespace EncodeAndStreamFiles
                 SubscriptionId = config.SubscriptionId,
             };
         }
-
+        #endregion
+            
         /// <summary>
         /// If the specified transform exists, get that transform.
         /// If the it does not exist, creates a new transform with the specified output. 
