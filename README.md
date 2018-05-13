@@ -1,3 +1,9 @@
+---
+services: media-services
+platforms: dotnet
+author: Juliako
+---
+
 # Azure Media Services v3 quickstart starter samples
 
 The projects in this repository support the Azure Media Services v3 quickstart articles:
